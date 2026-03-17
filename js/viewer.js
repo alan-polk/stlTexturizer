@@ -1,9 +1,14 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { LineSegments2 }  from 'three/addons/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
+import { LineMaterial }   from 'three/addons/lines/LineMaterial.js';
 
 let renderer, camera, scene, controls, meshGroup, ambientLight, dirLight1, dirLight2, grid;
 let currentMesh = null;
 let axesGroup = null;
+let wireframeLines = null;   // LineSegments overlay, or null when hidden
+let wireframeVisible = false;
 
 // Build a labelled coordinate axes indicator scaled to `size`.
 // X = red, Y = green, Z = blue (up).
@@ -131,6 +136,13 @@ function onResize() {
   camera.left   = -halfH * aspect;
   camera.right  =  halfH * aspect;
   camera.updateProjectionMatrix();
+  // LineMaterial needs the actual pixel resolution to compute linewidth correctly
+  if (wireframeLines) {
+    wireframeLines.material.resolution.set(
+      w * renderer.getPixelRatio(),
+      h * renderer.getPixelRatio(),
+    );
+  }
 }
 
 /**
@@ -160,6 +172,11 @@ export function loadGeometry(geometry, material) {
   currentMesh.castShadow = true;
   currentMesh.receiveShadow = true;
   meshGroup.add(currentMesh);
+
+  // Rebuild wireframe overlay to match the new geometry
+  // (old overlay is already gone because meshGroup was cleared above)
+  wireframeLines = null;
+  if (wireframeVisible) _buildWireframe(geometry);
 
   // Position grid at mesh bottom (Z-up: move grid along Z)
   geometry.computeBoundingBox();
@@ -232,3 +249,51 @@ export function getRenderer() { return renderer; }
 export function getCamera()   { return camera; }
 export function getScene()    { return scene; }
 export function getCurrentMesh() { return currentMesh; }
+
+/**
+ * Show or hide the triangle-edge wireframe overlay.
+ * @param {boolean} enabled
+ */
+export function setWireframe(enabled) {
+  wireframeVisible = enabled;
+  if (enabled) {
+    if (!wireframeLines && currentMesh) _buildWireframe(currentMesh.geometry);
+    if (wireframeLines) wireframeLines.visible = true;
+  } else {
+    if (wireframeLines) wireframeLines.visible = false;
+  }
+}
+
+function _buildWireframe(geometry) {
+  // Dispose any stale overlay
+  if (wireframeLines) {
+    if (wireframeLines.parent) wireframeLines.parent.remove(wireframeLines);
+    wireframeLines.geometry.dispose();
+    wireframeLines.material.dispose();
+    wireframeLines = null;
+  }
+
+  // EdgesGeometry gives one segment per unique triangle edge
+  const edgesGeo = new THREE.EdgesGeometry(geometry, 1);
+
+  // Convert to LineSegmentsGeometry (required by LineMaterial / LineSegments2)
+  const lsGeo = new LineSegmentsGeometry().fromEdgesGeometry(edgesGeo);
+  edgesGeo.dispose();
+
+  const lsMat = new LineMaterial({
+    color: 0xffffff,
+    opacity: 0.75,
+    transparent: true,
+    linewidth: 1.5,          // pixels — works on all desktop GPUs
+    depthTest: true,
+    resolution: new THREE.Vector2(
+      renderer.domElement.width  * renderer.getPixelRatio(),
+      renderer.domElement.height * renderer.getPixelRatio(),
+    ),
+  });
+
+  wireframeLines = new LineSegments2(lsGeo, lsMat);
+  wireframeLines.renderOrder = 1;
+  // Add to meshGroup so it's automatically removed when a new model is loaded
+  meshGroup.add(wireframeLines);
+}

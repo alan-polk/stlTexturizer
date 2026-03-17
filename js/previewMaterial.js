@@ -77,10 +77,27 @@ const fragmentShader = /* glsl */`
       return sampleMap((pos.yz - boundsMin.yz) / max(boundsSize.yz, vec2(1e-4)));
 
     } else if (mappingMode == 3) {
-      // Cylindrical around Z axis (Z is up)
-      float u = atan(rel.y, rel.x) / TWO_PI + 0.5;
-      float v = (pos.z - boundsMin.z) / max(boundsSize.z, 1e-4);
-      return sampleMap(vec2(u, v));
+      // Cylindrical around Z axis (Z is up) with automatic caps.
+      //
+      // Side: V is arc-length-normalised (divided by circumference C = 2πr)
+      //   so that scaleU = scaleV gives square, un-stretched texels on the surface.
+      //
+      // Cap (|normalZ| > 0.5): planar XY centred on the cylinder axis, one tile
+      //   fills the diameter × diameter square so the disc looks fully textured.
+      float r = max(boundsSize.x, boundsSize.y) * 0.5;
+      float C = TWO_PI * max(r, 1e-4);
+      if (abs(vModelNormal.z) > 0.5) {
+        // Cap face — normalise by C so one tile = same world size as on the side
+        return sampleMap(vec2(
+          rel.x / C + 0.5,
+          rel.y / C + 0.5
+        ));
+      }
+      // Side face
+      return sampleMap(vec2(
+        atan(rel.y, rel.x) / TWO_PI + 0.5,
+        (pos.z - boundsMin.z) / C
+      ));
 
     } else if (mappingMode == 4) {
       // Spherical — Z is up

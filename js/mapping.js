@@ -51,12 +51,27 @@ export function computeUV(pos, normal, mode, settings, bounds) {
     }
 
     case MODE_CYLINDRICAL: {
-      // Z is up: wrap around Z axis, height along Z
+      // Cylindrical around Z axis with automatic caps.
+      //
+      // Side: V arc-length-normalised by circumference C = 2πr so that
+      //   scaleU = scaleV gives un-stretched square texels on the surface.
+      //
+      // Cap (|normalZ| > 0.5): planar XY centred on the axis, scaled to the
+      //   diameter so one tile covers the full cap disc.
+      const r  = Math.max(size.x, size.y) * 0.5;
+      const C  = TWO_PI * Math.max(r, 1e-6);
       const rx = pos.x - center.x;
       const ry = pos.y - center.y;
-      const theta = Math.atan2(ry, rx);              // [-PI, PI]
-      u = (theta / TWO_PI) + 0.5;                    // [0, 1]
-      v = (pos.z - min.z) / Math.max(size.z, 1e-6);
+      if (Math.abs(normal.z) > 0.5) {
+        // Cap face — normalise by C so one tile = same world size as on the side
+        u = rx / C + 0.5;
+        v = ry / C + 0.5;
+      } else {
+        // Side face
+        const theta = Math.atan2(ry, rx);
+        u = (theta / TWO_PI) + 0.5;
+        v = (pos.z - min.z) / C;
+      }
       break;
     }
 

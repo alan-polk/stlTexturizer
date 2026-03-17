@@ -1,4 +1,4 @@
-import { initViewer, loadGeometry, setMeshMaterial } from './viewer.js';
+import { initViewer, loadGeometry, setMeshMaterial, setWireframe } from './viewer.js';
 import { loadSTLFile, computeBounds, getTriangleCount }  from './stlLoader.js';
 import { PRESETS, loadCustomTexture }  from './presetTextures.js';
 import { createPreviewMaterial, updateMaterial } from './previewMaterial.js';
@@ -42,6 +42,7 @@ const exportProgress   = document.getElementById('export-progress');
 const exportProgBar    = document.getElementById('export-progress-bar');
 const exportProgLbl    = document.getElementById('export-progress-label');
 const triLimitWarning  = document.getElementById('tri-limit-warning');
+const wireframeToggle  = document.getElementById('wireframe-toggle');
 
 const mappingSelect   = document.getElementById('mapping-mode');
 const scaleUSlider    = document.getElementById('scale-u');
@@ -192,6 +193,9 @@ function wireEvents() {
 
   // ── Export ──
   exportBtn.addEventListener('click', handleExport);
+
+  // ── Wireframe ──
+  wireframeToggle.addEventListener('change', () => setWireframe(wireframeToggle.checked));
 }
 
 // ── Slider helper ─────────────────────────────────────────────────────────────

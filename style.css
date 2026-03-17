@@ -145,6 +145,16 @@ main {
   color: #555566;
 }
 
+.wireframe-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
 /* ── Settings panel ──────────────────────────────────────────────────── */
 #settings-panel {
   width: var(--sidebar-w);

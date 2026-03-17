@@ -10,15 +10,10 @@ const exporter = new STLExporter();
  * @param {string} [filename]
  */
 export function exportSTL(geometry, filename = 'textured.stl') {
-  // The geometry was rotated -90° around X on load to convert Z-up → Y-up for the viewer.
-  // Undo that rotation before export so the STL lands back in the original Z-up orientation
-  // that 3D-print slicers expect.
-  const exportGeom = geometry.clone();
-  exportGeom.applyMatrix4(new THREE.Matrix4().makeRotationX(Math.PI / 2));
-
-  const mesh = new THREE.Mesh(exportGeom, new THREE.MeshBasicMaterial());
+  // Geometry is already in the original Z-up orientation (the loader never rotates it;
+  // the viewer uses a Z-up camera instead). Export as-is so slicers receive the correct pose.
+  const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial());
   const result = exporter.parse(mesh, { binary: true });
-  exportGeom.dispose();
 
   // result is an ArrayBuffer in binary mode
   const blob = new Blob([result], { type: 'application/octet-stream' });
