@@ -66,7 +66,7 @@ const fragmentShader = /* glsl */`
     uv -= 0.5;
     uv  = vec2(c * uv.x - s * uv.y, s * uv.x + c * uv.y);
     uv += 0.5;
-    return texture2D(displacementMap, fract(uv)).r;
+    return texture2D(displacementMap, uv).r;
   }
 
   // Height at this fragment for all projection modes.
@@ -134,7 +134,7 @@ const fragmentShader = /* glsl */`
       // Picks the single planar projection whose axis is most aligned with the face normal.
       vec3 absN = abs(MN);
       if (absN.x >= absN.y && absN.x >= absN.z) {
-        return sampleMap(vec2((pos.z - boundsMin.z) / md, (pos.y - boundsMin.y) / md));
+        return sampleMap(vec2((pos.y - boundsMin.y) / md, (pos.z - boundsMin.z) / md));
       } else if (absN.y >= absN.x && absN.y >= absN.z) {
         return sampleMap(vec2((pos.x - boundsMin.x) / md, (pos.z - boundsMin.z) / md));
       } else {

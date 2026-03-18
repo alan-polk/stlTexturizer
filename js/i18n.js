@@ -47,7 +47,7 @@ export const TRANSLATIONS = {
     'tooltips.proportionalScalingAria':  'Proportional scaling (U = V)',
 
     // Displacement section
-    'sections.displacement': 'Displacement',
+    'sections.displacement': 'Texture Depth',
     'labels.amplitude':      'Amplitude',
 
     // Surface mask section
@@ -143,7 +143,7 @@ export const TRANSLATIONS = {
     'ui.loadStl':        'STL laden\u2026',
 
     // Displacement map section
-    'sections.displacementMap': 'Verschiebungstextur',
+    'sections.displacementMap': 'Textur',
     'ui.uploadCustomMap':  'Eigene Textur hochladen',
     'ui.noMapSelected':    'Keine Textur ausgew\u00e4hlt',
 

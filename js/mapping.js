@@ -96,8 +96,8 @@ export function computeUV(pos, normal, mode, settings, bounds) {
       const az = Math.abs(normal.z);
       let uRaw, vRaw;
       if (ax >= ay && ax >= az) {
-        uRaw = (pos.z - min.z) / md;
-        vRaw = (pos.y - min.y) / md;
+        uRaw = (pos.y - min.y) / md;
+        vRaw = (pos.z - min.z) / md;
       } else if (ay >= ax && ay >= az) {
         uRaw = (pos.x - min.x) / md;
         vRaw = (pos.z - min.z) / md;

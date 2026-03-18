@@ -117,12 +117,12 @@ const exclSectionHeading  = document.getElementById('excl-section-heading');
 const exclHint            = document.getElementById('excl-hint');
 
 // ── Scale slider log helpers ──────────────────────────────────────────────────
-// Slider stores 0–1000; actual scale spans 0.1–10 on a log axis.
-// Middle position 500 → scale 1.0 (exact midpoint on log scale).
-const _LOG_MIN = Math.log(0.1);
+// Slider stores 0–1000; actual scale spans 0.05–10 on a log axis.
+// Middle position 500 → scale ~0.71 (log midpoint between 0.05 and 10).
+const _LOG_MIN = Math.log(0.05);
 const _LOG_MAX = Math.log(10);
-const scaleToPos = v => Math.round((Math.log(Math.max(0.1, Math.min(10, v))) - _LOG_MIN) / (_LOG_MAX - _LOG_MIN) * 1000);
-const posToScale = p => parseFloat(Math.exp(_LOG_MIN + (p / 1000) * (_LOG_MAX - _LOG_MIN)).toFixed(1));
+const scaleToPos = v => Math.round((Math.log(Math.max(0.05, Math.min(10, v))) - _LOG_MIN) / (_LOG_MAX - _LOG_MIN) * 1000);
+const posToScale = p => parseFloat(Math.exp(_LOG_MIN + (p / 1000) * (_LOG_MAX - _LOG_MIN)).toFixed(2));
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
@@ -261,7 +261,7 @@ function wireEvents() {
 
   // Scale U — when lock is on, mirror to V
   const applyScaleU = (v) => {
-    v = Math.max(0.1, Math.min(10, v));
+    v = Math.max(0.05, Math.min(10, v));
     settings.scaleU = v;
     scaleUSlider.value = scaleToPos(v);
     scaleUVal.value = v;
@@ -273,7 +273,7 @@ function wireEvents() {
 
   // Scale V — when lock is on, mirror to U
   const applyScaleV = (v) => {
-    v = Math.max(0.1, Math.min(10, v));
+    v = Math.max(0.05, Math.min(10, v));
     settings.scaleV = v;
     scaleVSlider.value = scaleToPos(v);
     scaleVVal.value = v;

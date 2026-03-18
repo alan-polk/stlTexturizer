@@ -1,5 +1,7 @@
 # STL Texturizer
 
+**Live demo:** https://cnckitchen.github.io/stlTexturizer/
+
 A browser-based tool for applying surface displacement textures to STL files — no installation required.
 
 Load any `.stl` file, pick a texture, tune the parameters, and export a new displaced STL ready for slicing.
