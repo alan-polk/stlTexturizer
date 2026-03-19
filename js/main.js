@@ -51,6 +51,7 @@ const settings = {
   bottomAngleLimit: 5,
   topAngleLimit:    0,
   mappingBlend:     1,
+  seamBandWidth:    0.5,
   symmetricDisplacement: false,
 };
 
@@ -100,6 +101,8 @@ const bottomAngleLimitVal    = document.getElementById('bottom-angle-limit-val')
 const topAngleLimitVal       = document.getElementById('top-angle-limit-val');
 const seamBlendSlider        = document.getElementById('seam-blend');
 const seamBlendVal           = document.getElementById('seam-blend-val');
+const seamBandWidthSlider    = document.getElementById('seam-band-width');
+const seamBandWidthVal       = document.getElementById('seam-band-width-val');
 const symmetricDispToggle    = document.getElementById('symmetric-displacement');
 
 // ── Exclusion panel DOM refs ──────────────────────────────────────────────────
@@ -166,6 +169,7 @@ scaleVVal.value = posToScale(parseFloat(scaleVSlider.value));
 loadPresets().then(presets => {
   PRESETS = presets;
   buildPresetGrid();
+  loadDefaultCube();
   // Select Crystal as the default preset
   const noiseIdx = PRESETS.findIndex(p => p.name === 'Crystal');
   const defaultIdx = noiseIdx !== -1 ? noiseIdx : 0;
@@ -312,6 +316,7 @@ function wireEvents() {
   linkSlider(bottomAngleLimitSlider, bottomAngleLimitVal, v => { settings.bottomAngleLimit = v; return v; });
   linkSlider(topAngleLimitSlider,    topAngleLimitVal,    v => { settings.topAngleLimit    = v; return v; });
   linkSlider(seamBlendSlider,        seamBlendVal,        v => { settings.mappingBlend     = v; return v.toFixed(2); });
+  linkSlider(seamBandWidthSlider,    seamBandWidthVal,    v => { settings.seamBandWidth    = v; return v.toFixed(2); });
   symmetricDispToggle.addEventListener('change', () => {
     settings.symmetricDisplacement = symmetricDispToggle.checked;
     updatePreview();
@@ -674,6 +679,62 @@ function formatM(n) {
 }
 
 // ── STL loading ───────────────────────────────────────────────────────────────
+
+function loadDefaultCube() {
+  // Create a 50×50×50 mm box; convert to non-indexed so it behaves like a
+  // real STL (buildAdjacency and displacement expect non-indexed geometry).
+  const geo = new THREE.BoxGeometry(50, 50, 50).toNonIndexed();
+  geo.computeBoundingBox();
+  geo.computeVertexNormals();
+
+  currentGeometry = geo;
+  currentBounds   = computeBounds(geo);
+  currentStlName  = 'cube_50x50x50';
+  checkAmplitudeWarning();
+
+  loadGeometry(geo);
+  dropHint.classList.add('hidden');
+
+  // Reset exclusion state
+  excludedFaces     = new Set();
+  exclusionTool     = null;
+  eraseMode         = false;
+  isPainting        = false;
+  exclBrushBtn.classList.remove('active');
+  exclBucketBtn.classList.remove('active');
+  exclEraseToggle.classList.remove('active');
+  exclBrushTypeRow.classList.add('hidden');
+  exclRadiusRow.classList.add('hidden');
+  exclThresholdRow.classList.add('hidden');
+  canvas.style.cursor = '';
+  setExclusionOverlay(null);
+  setHoverPreview(null);
+  _lastHoverTriIdx = -1;
+  exclCount.textContent = t('excl.initExcluded');
+
+  const adjData = buildAdjacency(geo);
+  triangleAdjacency = adjData.adjacency;
+  triangleCentroids = adjData.centroids;
+
+  settings.scaleU  = 0.5; scaleUSlider.value = scaleToPos(0.5); scaleUVal.value = 0.5;
+  settings.scaleV  = 0.5; scaleVSlider.value = scaleToPos(0.5); scaleVVal.value = 0.5;
+  settings.offsetU = 0; offsetUSlider.value = 0; offsetUVal.value = 0;
+  settings.offsetV = 0; offsetVSlider.value = 0; offsetVVal.value = 0;
+  triLimitWarning.classList.add('hidden');
+
+  const maxDim = Math.max(currentBounds.size.x, currentBounds.size.y, currentBounds.size.z);
+  const defaultEdge = Math.max(0.05, Math.min(5.0, +(maxDim / 200).toFixed(2)));
+  settings.refineLength = defaultEdge;
+  refineLenSlider.value = defaultEdge;
+  refineLenVal.value = defaultEdge;
+
+  const triCount = getTriangleCount(geo);
+  const mb = ((geo.attributes.position.array.byteLength) / 1024 / 1024).toFixed(2);
+  meshInfo.textContent = t('ui.meshInfo', { n: triCount.toLocaleString(), mb });
+
+  exportBtn.disabled = (activeMapEntry === null);
+  updatePreview();
+}
 
 async function handleSTL(file) {
   try {

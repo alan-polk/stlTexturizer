@@ -55,6 +55,7 @@ const fragmentShader = /* glsl */`
   uniform float     bottomAngleLimit; // degrees from horizontal; 0 = disabled
   uniform float     topAngleLimit;    // degrees from horizontal; 0 = disabled
   uniform float     mappingBlend;     // 0 = sharp seams, 1 = fully blended
+  uniform float     seamBandWidth;    // width of the blend zone near cube-face seams
   uniform int       symmetricDisplacement; // 1 = remap [0,1]→[-1,1] so 50% grey = no disp
 
   varying vec3 vModelPos;
@@ -91,7 +92,7 @@ const fragmentShader = /* glsl */`
                 : axis == 1 ? vec3(0.0, 1.0, 0.0)
                             : vec3(0.0, 0.0, 1.0);
 
-    float seamWidth = max(mappingBlend * 0.35, CUBIC_AXIS_EPSILON * 2.0);
+    float seamWidth = max(seamBandWidth, CUBIC_AXIS_EPSILON * 2.0);
     float seamMixRaw = 1.0 - clamp((primary - secondary) / seamWidth, 0.0, 1.0);
     float seamMix = mappingBlend * seamMixRaw * seamMixRaw * (3.0 - 2.0 * seamMixRaw);
     if (seamMix <= 0.001) return oneHot;
@@ -290,6 +291,7 @@ export function updateMaterial(material, displacementTexture, settings) {
   u.bottomAngleLimit.value = settings.bottomAngleLimit ?? 5.0;
   u.topAngleLimit.value    = settings.topAngleLimit    ?? 0.0;
   u.mappingBlend.value            = settings.mappingBlend            ?? 0.0;
+  u.seamBandWidth.value           = settings.seamBandWidth           ?? 0.35;
   u.symmetricDisplacement.value   = settings.symmetricDisplacement   ? 1 : 0;
 }
 
@@ -314,6 +316,7 @@ function buildUniforms(tex, settings) {
     bottomAngleLimit: { value: settings.bottomAngleLimit ?? 5.0 },
     topAngleLimit:    { value: settings.topAngleLimit    ?? 0.0 },
     mappingBlend:             { value: settings.mappingBlend            ?? 0.0 },
+    seamBandWidth:            { value: settings.seamBandWidth            ?? 0.35 },
     symmetricDisplacement:    { value: settings.symmetricDisplacement   ? 1 : 0 },
   };
 }

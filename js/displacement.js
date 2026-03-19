@@ -124,8 +124,9 @@ export function applyDisplacement(geometry, imageData, imgWidth, imgHeight, sett
     let czX = 0, czY = 0, czZ = 0;
     if (settings.mappingMode === 6 && faceArea > 1e-12) {
       const cubicBlend = settings.mappingBlend ?? 0;
+      const cubicBandWidth = settings.seamBandWidth ?? 0.35;
       const unitFaceNrm = { x: faceNrm.x / faceArea, y: faceNrm.y / faceArea, z: faceNrm.z / faceArea };
-      const w = getCubicBlendWeights(unitFaceNrm, cubicBlend);
+      const w = getCubicBlendWeights(unitFaceNrm, cubicBlend, cubicBandWidth);
       czX = w.x * faceArea;
       czY = w.y * faceArea;
       czZ = w.z * faceArea;

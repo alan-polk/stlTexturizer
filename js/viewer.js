@@ -341,6 +341,7 @@ export function setSceneBackground(hexColor) {
 export function setViewerTheme(isLight) {
   if (!scene) return;
   scene.background = new THREE.Color(isLight ? 0xf0f0f5 : 0x111114);
+  const savedZ = grid ? grid.position.z : 0;
   if (grid) {
     scene.remove(grid);
     grid.geometry.dispose();
@@ -352,7 +353,7 @@ export function setViewerTheme(isLight) {
     isLight ? 0xd0d0e0 : 0x1e1e24
   );
   grid.rotation.x = Math.PI / 2;
-  grid.position.z = 0;
+  grid.position.z = savedZ;
   scene.add(grid);
 }
 

@@ -37,7 +37,7 @@ export function isAmbiguousCubicNormal(normal) {
   return primary - secondary <= CUBIC_AXIS_EPSILON;
 }
 
-export function getCubicBlendWeights(normal, blend) {
+export function getCubicBlendWeights(normal, blend, seamBandWidth = 0.35) {
   const axis = getDominantCubicAxis(normal);
   const ax = Math.abs(normal.x);
   const ay = Math.abs(normal.y);
@@ -61,7 +61,7 @@ export function getCubicBlendWeights(normal, blend) {
 
   // Only blend inside a seam band around the cube-face boundary. This keeps
   // strongly dominant faces fully textured even when the slider is barely on.
-  const seamWidth = Math.max(blend * 0.35, CUBIC_AXIS_EPSILON * 2);
+  const seamWidth = Math.max(seamBandWidth, CUBIC_AXIS_EPSILON * 2);
   const seamMixRaw = 1 - Math.min(1, Math.max(0, (primary - secondary) / seamWidth));
   const seamMix = blend * seamMixRaw * seamMixRaw * (3 - 2 * seamMixRaw);
   if (seamMix <= 0.001) return oneHot;
@@ -183,7 +183,7 @@ export function computeUV(pos, normal, mode, settings, bounds) {
     }
 
     case MODE_CUBIC: {
-      const weights = getCubicBlendWeights(normal, settings.mappingBlend ?? 0.0);
+      const weights = getCubicBlendWeights(normal, settings.mappingBlend ?? 0.0, settings.seamBandWidth ?? 0.35);
       const tYZ = applyTransform((pos.y - min.y) / md, (pos.z - min.z) / md, scaleU, scaleV, offsetU, offsetV, rotRad);
       const tXZ = applyTransform((pos.x - min.x) / md, (pos.z - min.z) / md, scaleU, scaleV, offsetU, offsetV, rotRad);
       const tXY = applyTransform((pos.x - min.x) / md, (pos.y - min.y) / md, scaleU, scaleV, offsetU, offsetV, rotRad);
