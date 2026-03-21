@@ -26,6 +26,8 @@ let previewDebounce   = null;
 // Boundary edge data texture for per-fragment falloff in bump-only preview
 let _boundaryEdgeTex   = null;
 let _boundaryEdgeCount = 0;
+let _falloffDirty      = true;   // recompute falloff on next updateFaceMask
+let _falloffGeometry   = null;   // geometry the falloff was last computed for
 
 // ── Exclusion state ───────────────────────────────────────────────────────────
 let excludedFaces      = new Set();   // triangle indices in currentGeometry
@@ -331,11 +333,11 @@ function wireEvents() {
   linkSlider(rotationSlider,  rotationVal,  v => { settings.rotation  = v; return Math.round(v); });
   linkSlider(amplitudeSlider, amplitudeVal, v => { settings.amplitude = v; checkAmplitudeWarning(); return v.toFixed(2); });
   amplitudeVal.addEventListener('change', checkAmplitudeWarning);
-  linkSlider(boundaryFalloffSlider, boundaryFalloffVal, v => { settings.boundaryFalloff = v; return v.toFixed(1); });
+  linkSlider(boundaryFalloffSlider, boundaryFalloffVal, v => { settings.boundaryFalloff = v; _falloffDirty = true; return v.toFixed(1); });
   linkSlider(refineLenSlider, refineLenVal, v => { settings.refineLength  = v; return v.toFixed(2); }, false);
   linkSlider(maxTriSlider, maxTriVal, v => { settings.maxTriangles = v; return formatM(v); }, false);
-  linkSlider(bottomAngleLimitSlider, bottomAngleLimitVal, v => { settings.bottomAngleLimit = v; return v; });
-  linkSlider(topAngleLimitSlider,    topAngleLimitVal,    v => { settings.topAngleLimit    = v; return v; });
+  linkSlider(bottomAngleLimitSlider, bottomAngleLimitVal, v => { settings.bottomAngleLimit = v; _falloffDirty = true; return v; });
+  linkSlider(topAngleLimitSlider,    topAngleLimitVal,    v => { settings.topAngleLimit    = v; _falloffDirty = true; return v; });
   linkSlider(seamBlendSlider,        seamBlendVal,        v => { settings.mappingBlend     = v; return v.toFixed(2); });
   linkSlider(seamBandWidthSlider,    seamBandWidthVal,    v => { settings.seamBandWidth    = v; return v.toFixed(2); });
   symmetricDispToggle.addEventListener('change', () => {
@@ -796,6 +798,7 @@ function handlePlaceOnFaceClick(e) {
 
 function refreshExclusionOverlay() {
   if (!currentGeometry) return;
+  _falloffDirty = true;
   if (selectionMode) {
     // Include Only mode: tint the complement (non-selected faces) with a pastel blue
     // so the model stays visible against the dark background before any faces are painted.
@@ -1146,8 +1149,12 @@ function updateFaceMask(geometry) {
     addFaceNormals(geometry);
   }
 
-  computeBoundaryFalloffAttr(geometry, maskArr);
-  computeBoundaryEdges(geometry, maskArr);
+  if (_falloffDirty || geometry !== _falloffGeometry) {
+    computeBoundaryFalloffAttr(geometry, maskArr);
+    computeBoundaryEdges(geometry, maskArr);
+    _falloffDirty = false;
+    _falloffGeometry = geometry;
+  }
   syncBoundaryEdgeUniforms();
 }
 
@@ -1388,7 +1395,7 @@ function computeBoundaryEdges(geometry, userMaskArr) {
     }
   }
 
-  const MAX_EDGES = 512;
+  const MAX_EDGES = 64;
   const edges = [];
   for (const [key, faces] of edgeFaces) {
     if (edges.length >= MAX_EDGES) break;

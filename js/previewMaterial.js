@@ -248,7 +248,7 @@ const fragmentShader = /* glsl */`
     // compute the distance from each pixel to the nearest boundary edge.
     if (useDisplacement == 0 && boundaryFalloffDist > 0.001 && boundaryEdgeCount > 0) {
       float minDist = boundaryFalloffDist;
-      for (int i = 0; i < 512; i++) {
+      for (int i = 0; i < 64; i++) {
         if (i >= boundaryEdgeCount) break;
         float uA = (float(i * 2) + 0.5) / boundaryEdgeTexWidth;
         float uB = (float(i * 2 + 1) + 0.5) / boundaryEdgeTexWidth;
@@ -258,7 +258,7 @@ const fragmentShader = /* glsl */`
         float abLen2 = dot(ab, ab);
         float t = clamp(dot(vModelPos - ea, ab) / max(abLen2, 1e-10), 0.0, 1.0);
         float d = length(vModelPos - (ea + t * ab));
-        minDist = min(minDist, d);
+        if (d < minDist) { minDist = d; if (d < 1e-4) break; }
       }
       maskBlend *= clamp(minDist / boundaryFalloffDist, 0.0, 1.0);
     }
