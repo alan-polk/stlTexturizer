@@ -190,8 +190,18 @@ export function initViewer(canvas) {
   // We disable OrbitControls' own rotation and handle it manually so that
   // neither the camera view nor the target "snaps" to the clicked point.
   const _orbitRaycaster = new THREE.Raycaster();
-  let _customPivot = null;
-  let _lastPointer = null;
+  let _customPivot     = null;   // active pivot for the current drag
+  let _lastKnownPivot  = null;   // persists between drags as fallback
+  let _lastPointer     = null;
+
+  // Small red sphere shown at the orbit centre during a drag
+  const _pivotMarker = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 16, 10),
+    new THREE.MeshBasicMaterial({ color: 0xff2222, depthTest: false }),
+  );
+  _pivotMarker.renderOrder = 10;
+  _pivotMarker.visible = false;
+  scene.add(_pivotMarker);
 
   renderer.domElement.addEventListener('pointerdown', (e) => {
     if (e.button !== 0 || !controls.enabled) return;
@@ -204,10 +214,21 @@ export function initViewer(canvas) {
     _orbitRaycaster.setFromCamera(ndc, camera);
     const hits = _orbitRaycaster.intersectObject(currentMesh);
     if (hits.length) {
-      _customPivot  = hits[0].point.clone();
-      _lastPointer  = { x: e.clientX, y: e.clientY };
-      controls.enableRotate = false;   // we'll rotate manually
+      _customPivot = hits[0].point.clone();
+      _lastKnownPivot = _customPivot.clone();
+    } else if (_lastKnownPivot) {
+      _customPivot = _lastKnownPivot.clone();
+    } else {
+      return; // no pivot available yet, fall back to OrbitControls default
     }
+    _lastPointer = { x: e.clientX, y: e.clientY };
+    controls.enableRotate = false;   // we'll rotate manually
+
+    // Show marker, sized as ~1.5 % of the visible frustum height
+    _pivotMarker.position.copy(_customPivot);
+    const markerScale = (camera.top / camera.zoom) * 0.015;
+    _pivotMarker.scale.setScalar(markerScale);
+    _pivotMarker.visible = true;
   });
 
   document.addEventListener('pointermove', (e) => {
@@ -244,6 +265,52 @@ export function initViewer(canvas) {
       _customPivot  = null;
       _lastPointer  = null;
       controls.enableRotate = true;
+      _pivotMarker.visible = false;
+    }
+  });
+
+  // Pinch-to-zoom for touch devices
+  let _pinchDist = null;
+
+  renderer.domElement.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+      const t0 = e.touches[0], t1 = e.touches[1];
+      _pinchDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+      controls.enabled = false;  // suppress OrbitControls panning during pinch
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  renderer.domElement.addEventListener('touchmove', (e) => {
+    if (e.touches.length !== 2 || _pinchDist === null) return;
+    e.preventDefault();
+    const t0 = e.touches[0], t1 = e.touches[1];
+    const newDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+    const factor  = newDist / _pinchDist;
+    _pinchDist    = newDist;
+
+    // Midpoint in NDC — zoom toward the centre of the two fingers
+    const rect = renderer.domElement.getBoundingClientRect();
+    const midX = (t0.clientX + t1.clientX) / 2;
+    const midY = (t0.clientY + t1.clientY) / 2;
+    const ndcX =  ((midX - rect.left) / rect.width)  * 2 - 1;
+    const ndcY = -((midY - rect.top)  / rect.height) * 2 + 1;
+
+    const before = new THREE.Vector3(ndcX, ndcY, 0).unproject(camera);
+    camera.zoom = Math.max(0.05, Math.min(200, camera.zoom * factor));
+    camera.updateProjectionMatrix();
+    const after = new THREE.Vector3(ndcX, ndcY, 0).unproject(camera);
+
+    const delta = before.clone().sub(after);
+    camera.position.add(delta);
+    controls.target.add(delta);
+    controls.update();
+  }, { passive: false });
+
+  renderer.domElement.addEventListener('touchend', (e) => {
+    if (e.touches.length < 2) {
+      _pinchDist = null;
+      controls.enabled = true;
     }
   });
 
