@@ -13,6 +13,13 @@ const objLoader = new OBJLoader();
  * Returns { geometry, bounds } where bounds = { min, max, center, size } (THREE.Vector3).
  * The geometry is translated so its bounding-box centre is at the world origin.
  */
+function parseSTLFromArrayBuffer(arrayBuffer) {
+  const geometry = stlLoader.parse(arrayBuffer);
+  const { nanCount, degenerateCount } = setupGeometry(geometry);
+  const bounds = computeBounds(geometry);
+  return { geometry, bounds, nanCount, degenerateCount };
+}
+
 export function loadSTLFile(file) {
   if (file.size > MAX_FILE_SIZE) {
     return Promise.reject(new Error(
@@ -23,10 +30,7 @@ export function loadSTLFile(file) {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const geometry = stlLoader.parse(e.target.result);
-        const { nanCount, degenerateCount } = setupGeometry(geometry);
-        const bounds = computeBounds(geometry);
-        resolve({ geometry, bounds, nanCount, degenerateCount });
+        resolve(parseSTLFromArrayBuffer(e.target.result));
       } catch (err) {
         reject(err);
       }
@@ -147,6 +151,14 @@ export function getTriangleCount(geometry) {
  * Load an OBJ from a File object.
  * Returns { geometry, bounds }.
  */
+function parseOBJFromString(text) {
+  const group = objLoader.parse(text);
+  const geometry = mergeGroupGeometries(group);
+  const { nanCount, degenerateCount } = setupGeometry(geometry);
+  const bounds = computeBounds(geometry);
+  return { geometry, bounds, nanCount, degenerateCount };
+}
+
 export function loadOBJFile(file) {
   if (file.size > MAX_FILE_SIZE) {
     return Promise.reject(new Error(
@@ -157,11 +169,7 @@ export function loadOBJFile(file) {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const group = objLoader.parse(e.target.result);
-        const geometry = mergeGroupGeometries(group);
-        const { nanCount, degenerateCount } = setupGeometry(geometry);
-        const bounds = computeBounds(geometry);
-        resolve({ geometry, bounds, nanCount, degenerateCount });
+        resolve(parseOBJFromString(e.target.result));
       } catch (err) {
         reject(err);
       }
@@ -178,6 +186,13 @@ export function loadOBJFile(file) {
  * extension (p:path on <component> elements).
  * Returns { geometry, bounds }.
  */
+function parse3MFFromUint8Array(u8) {
+  const geometry = parse3MF(u8);
+  const { nanCount, degenerateCount } = setupGeometry(geometry);
+  const bounds = computeBounds(geometry);
+  return { geometry, bounds, nanCount, degenerateCount };
+}
+
 export function load3MFFile(file) {
   if (file.size > MAX_FILE_SIZE) {
     return Promise.reject(new Error(
@@ -188,10 +203,7 @@ export function load3MFFile(file) {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const geometry = parse3MF(new Uint8Array(e.target.result));
-        const { nanCount, degenerateCount } = setupGeometry(geometry);
-        const bounds = computeBounds(geometry);
-        resolve({ geometry, bounds, nanCount, degenerateCount });
+        resolve(parse3MFFromUint8Array(new Uint8Array(e.target.result)));
       } catch (err) {
         reject(err);
       }
@@ -421,13 +433,26 @@ function parse3MF(data) {
 }
 
 /**
+ * Load model from raw bytes (e.g. project restore). Extension comes from `fileName`.
+ */
+export function loadModelFileFromBuffer(arrayBuffer, fileName) {
+  const ext = fileName.split('.').pop().toLowerCase();
+  if (ext === 'obj') {
+    const text = new TextDecoder('utf-8').decode(arrayBuffer);
+    return Promise.resolve(parseOBJFromString(text));
+  }
+  if (ext === '3mf') {
+    return Promise.resolve(parse3MFFromUint8Array(new Uint8Array(arrayBuffer)));
+  }
+  return Promise.resolve(parseSTLFromArrayBuffer(arrayBuffer));
+}
+
+/**
  * Unified loader: dispatches to the right parser based on file extension.
  */
-export function loadModelFile(file) {
-  const ext = file.name.split('.').pop().toLowerCase();
-  if (ext === 'obj') return loadOBJFile(file);
-  if (ext === '3mf') return load3MFFile(file);
-  return loadSTLFile(file);
+export async function loadModelFile(file) {
+  const ab = await file.arrayBuffer();
+  return loadModelFileFromBuffer(ab, file.name);
 }
 
 /**

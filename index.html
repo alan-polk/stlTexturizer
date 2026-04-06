@@ -124,6 +124,21 @@
         </div>
       </section>
 
+      <!-- Full project (model + profile + painted masks) -->
+      <section class="panel-section project-section">
+        <div class="profile-toolbar">
+          <span class="profile-toolbar-label" data-i18n="project.label">Project</span>
+        </div>
+        <p class="project-hint" data-i18n="project.hint">Save or restore the mesh, texture settings, and surface masks in one file.</p>
+        <div class="profile-io">
+          <button type="button" id="project-save-btn" class="profile-io-btn" data-i18n="project.save" data-i18n-title="project.saveTitle" title="Download a .zip with your model and all settings">Save project…</button>
+          <label class="profile-io-btn profile-io-label" data-i18n-title="project.openTitle" title="Open a previously saved project">
+            <span data-i18n="project.open">Open project…</span>
+            <input type="file" id="project-open-input" accept=".zip,application/zip,.bumpmesh" hidden />
+          </label>
+        </div>
+      </section>
+
       <!-- Displacement Map -->
       <section class="panel-section">
         <h2 data-i18n="sections.displacementMap">Displacement Map</h2>

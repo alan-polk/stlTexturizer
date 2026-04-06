@@ -3,7 +3,7 @@ import { initViewer, loadGeometry, setMeshMaterial, setMeshGeometry, setWirefram
          getControls, getCamera, getCurrentMesh,
          setExclusionOverlay, setHoverPreview, setViewerTheme,
          setProjection, requestRender } from './viewer.js';
-import { loadModelFile, computeBounds, getTriangleCount }  from './stlLoader.js';
+import { loadModelFileFromBuffer, computeBounds, getTriangleCount }  from './stlLoader.js';
 import {
   loadAllThumbnails,
   loadFullPreset,
@@ -18,11 +18,12 @@ import {
   saveNamedProfile,
   listProfileNames,
 } from './profiles.js';
+import { buildProjectZipBytes, parseProjectZip } from './projectFile.js';
 import { createPreviewMaterial, updateMaterial } from './previewMaterial.js';
 import { subdivide }          from './subdivision.js';
 import { applyDisplacement }  from './displacement.js';
 import { decimate }           from './decimation.js';
-import { exportSTL, export3MF } from './exporter.js';
+import { exportSTL, export3MF, geometryToSTLBinary } from './exporter.js';
 import { buildAdjacency, bucketFill,
          buildExclusionOverlayGeo, buildFaceWeights } from './exclusion.js';
 import { t, initLang, setLang, getLang, applyTranslations, TRANSLATIONS } from './i18n.js';
@@ -293,6 +294,9 @@ const profileSaveConfirm = document.getElementById('profile-save-confirm');
 const profileSaveCancel  = document.getElementById('profile-save-cancel');
 const profileSaveClose   = document.getElementById('profile-save-close');
 
+const projectSaveBtn   = document.getElementById('project-save-btn');
+const projectOpenInput = document.getElementById('project-open-input');
+
 // ── Language selector DOM refs ────────────────────────────────────────────────────
 const languageSelector = document.querySelector('.lang-seg');
 
@@ -323,6 +327,10 @@ let stickyProfileJson = null;
 let activeProfileStorageName = null;
 let suppressProfileDirty = false;
 let profileDirtyTimer = null;
+
+/** Original model file bytes (for project save); null if using default cube only. */
+let lastLoadedModelBytes = null;
+let lastLoadedModelFileName = '';
 
 initViewer(canvas);
 
@@ -453,6 +461,7 @@ loadAllThumbnails().then(thumbs => {
     swatch.replaceChild(thumb.thumbCanvas, placeholder);
   });
   initProfiles();
+  initProjectFiles();
   // Auto-select the default preset
   const crystalIdx = IMAGE_PRESETS.findIndex(p => p.name === DEFAULT_PRESET_NAME);
   if (crystalIdx >= 0 && PRESETS[crystalIdx]) {
@@ -1684,6 +1693,20 @@ function collectExclusionUi() {
   };
 }
 
+/** Face indices in `currentGeometry` for project save (maps precision selection to base mesh). */
+function getOriginalExcludedFaceIndices() {
+  if (!currentGeometry) return [];
+  if (precisionMaskingEnabled && precisionParentMap && precisionGeometry) {
+    const orig = new Set();
+    for (const pf of precisionExcludedFaces) {
+      const oi = precisionParentMap[pf];
+      if (oi !== undefined) orig.add(oi);
+    }
+    return Array.from(orig).sort((a, b) => a - b);
+  }
+  return Array.from(excludedFaces).sort((a, b) => a - b);
+}
+
 function serializeProfileJsonString() {
   return JSON.stringify(buildProfilePayload(settings, activeMapEntry, collectExclusionUi()));
 }
@@ -1799,7 +1822,7 @@ function applyExclusionUiPayload(ui) {
   exclThresholdRow.classList.toggle('hidden', exclusionTool !== 'bucket');
 }
 
-async function applyProfilePayload(payload) {
+async function applyProfilePayload(payload, opts = {}) {
   if (!validateProfile(payload)) {
     throw new Error('Invalid profile');
   }
@@ -1861,8 +1884,10 @@ async function applyProfilePayload(payload) {
     suppressProfileDirty = false;
   }
 
-  profileBaselineJson = serializeProfileJsonString();
-  updateProfileDirtyUI();
+  if (!opts.skipBaseline) {
+    profileBaselineJson = serializeProfileJsonString();
+    updateProfileDirtyUI();
+  }
 }
 
 async function maybeApplyStickyProfile() {
@@ -1999,6 +2024,158 @@ function initProfiles() {
   });
 }
 
+function initProjectFiles() {
+  if (!projectSaveBtn || !projectOpenInput) return;
+
+  projectSaveBtn.addEventListener('click', () => {
+    const profile = buildProfilePayload(settings, activeMapEntry, collectExclusionUi());
+    if (profile.texture.kind === 'none') {
+      alert(t('project.needsMap'));
+      return;
+    }
+    if (!lastLoadedModelBytes && getOriginalExcludedFaceIndices().length > 0) {
+      alert(t('project.cubeMaskWarning'));
+      return;
+    }
+    let modelBytes = lastLoadedModelBytes;
+    let modelFileName = lastLoadedModelFileName;
+    if (!modelBytes && currentGeometry) {
+      try {
+        modelBytes = geometryToSTLBinary(currentGeometry);
+        modelFileName = `${currentStlName || 'model'}.stl`;
+      } catch (e) {
+        console.error(e);
+        alert(t('project.saveFailed', { msg: e.message }));
+        return;
+      }
+    }
+    if (!modelBytes) {
+      alert(t('project.needsModel'));
+      return;
+    }
+    const surfaceMask = { excludedFaceIndices: getOriginalExcludedFaceIndices() };
+    try {
+      const zipU8 = buildProjectZipBytes({
+        profile,
+        surfaceMask,
+        modelBytes,
+        modelFileName,
+      });
+      const blob = new Blob([zipU8], { type: 'application/zip' });
+      const base = (currentStlName || 'bumpmesh-project').replace(/[^\w\-]+/g, '_');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${base}.bumpmesh.zip`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e) {
+      console.error(e);
+      alert(t('project.saveFailed', { msg: e.message }));
+    }
+  });
+
+  projectOpenInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const buf = await file.arrayBuffer();
+      await applyProjectFromZipBuffer(buf);
+    } catch (err) {
+      console.error(err);
+      alert(t('project.openFailed', { msg: err.message }));
+    }
+  });
+}
+
+async function applyProjectFromZipBuffer(buf) {
+  const { manifest, modelBytes, modelFileName } = parseProjectZip(buf);
+
+  lastLoadedModelBytes = modelBytes.slice(0);
+  lastLoadedModelFileName = modelFileName;
+
+  const { geometry, bounds } = await loadModelFileFromBuffer(modelBytes, modelFileName);
+  currentGeometry = geometry;
+  currentBounds = bounds;
+  currentStlName = modelFileName.replace(/\.(stl|obj|3mf)$/i, '');
+  checkAmplitudeWarning();
+
+  if (previewMaterial) {
+    previewMaterial.dispose();
+    previewMaterial = null;
+  }
+
+  loadGeometry(geometry);
+  dropHint.classList.add('hidden');
+
+  if (dispPreviewGeometry) { dispPreviewGeometry.dispose(); dispPreviewGeometry = null; }
+  settings.useDisplacement = false;
+  dispPreviewToggle.checked = false;
+
+  if (precisionGeometry) { precisionGeometry.dispose(); precisionGeometry = null; }
+  precisionParentMap = null;
+  precisionEdgeLength = null;
+  precisionCentroids = null;
+  precisionBoundRadii = null;
+  precisionAdjacency = null;
+  precisionMaskingEnabled = false;
+  precisionMaskingToggle.checked = false;
+  precisionStatus.textContent = '';
+  precisionOutdated.classList.add('hidden');
+  precisionRefreshBtn.classList.add('hidden');
+  precisionWarning.classList.add('hidden');
+  precisionMaskingRow.classList.add('hidden');
+
+  excludedFaces = new Set();
+  precisionExcludedFaces = new Set();
+  exclusionTool = null;
+  eraseMode = false;
+  isPainting = false;
+  if (placeOnFaceActive) togglePlaceOnFace(false);
+  exclBrushBtn.classList.remove('active');
+  exclBucketBtn.classList.remove('active');
+  exclBrushTypeRow.classList.add('hidden');
+  exclRadiusRow.classList.add('hidden');
+  exclThresholdRow.classList.add('hidden');
+  canvas.style.cursor = '';
+  setExclusionOverlay(null);
+  setHoverPreview(null);
+  _lastHoverTriIdx = -1;
+  exclCount.textContent = t('excl.initExcluded');
+
+  const adjData = buildAdjacency(geometry);
+  triangleAdjacency = adjData.adjacency;
+  triangleCentroids = adjData.centroids;
+  triangleBoundRadii = adjData.boundRadii;
+
+  triLimitWarning.classList.add('hidden');
+
+  await applyProfilePayload(manifest.profile, { skipBaseline: true });
+
+  const triCount = getTriangleCount(geometry);
+  const raw = manifest.surfaceMask.excludedFaceIndices;
+  excludedFaces = new Set(
+    raw.filter(i => Number.isInteger(i) && i >= 0 && i < triCount),
+  );
+  refreshExclusionOverlay();
+
+  const mb = ((geometry.attributes.position.array.byteLength) / 1024 / 1024).toFixed(2);
+  const sx = bounds.size.x.toFixed(2);
+  const sy = bounds.size.y.toFixed(2);
+  const sz = bounds.size.z.toFixed(2);
+  meshInfo.textContent = t('ui.meshInfo', { n: triCount.toLocaleString(), mb, sx, sy, sz });
+
+  exportBtn.disabled = (activeMapEntry === null);
+  updatePreview();
+
+  stickyProfileJson = null;
+  activeProfileStorageName = null;
+  if (profileSelect) profileSelect.value = '';
+  refreshProfileDropdown();
+
+  setProfileBaselineFromCurrent();
+}
+
 // ── STL loading ───────────────────────────────────────────────────────────────
 
 function loadDefaultCube() {
@@ -2016,6 +2193,8 @@ function loadDefaultCube() {
   currentGeometry = geo;
   currentBounds   = computeBounds(geo);
   currentStlName  = 'cube_50x50x50';
+  lastLoadedModelBytes = null;
+  lastLoadedModelFileName = 'cube_50x50x50.stl';
   checkAmplitudeWarning();
 
   loadGeometry(geo);
@@ -2075,13 +2254,15 @@ function loadDefaultCube() {
 
 async function handleModelFile(file) {
   try {
-    const { geometry, bounds, nanCount, degenerateCount } = await loadModelFile(file);
+    const ab = await file.arrayBuffer();
+    lastLoadedModelBytes = ab.slice(0);
+    lastLoadedModelFileName = file.name;
+    const { geometry, bounds, nanCount, degenerateCount } = await loadModelFileFromBuffer(ab, file.name);
 
     // Invalidate any in-flight async operations tied to the previous model
     precisionToken++;
     dispPreviewToken++;
     exportToken++;
-
     currentGeometry = geometry;
     currentBounds   = bounds;
     currentStlName  = file.name.replace(/\.(stl|obj|3mf)$/i, '');

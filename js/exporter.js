@@ -20,7 +20,7 @@ function triggerDownload(buffer, filename, mime = 'application/octet-stream') {
 }
 
 /**
- * Fast binary STL exporter — writes directly from BufferGeometry arrays.
+ * Fast binary STL — writes directly from BufferGeometry arrays.
  *
  * Eliminates Three.js STLExporter overhead:
  * - No Mesh/Material creation
@@ -29,9 +29,9 @@ function triggerDownload(buffer, filename, mime = 'application/octet-stream') {
  * - Bulk Uint8Array.set() instead of per-float DataView calls
  *
  * @param {THREE.BufferGeometry} geometry  – non-indexed with position + normal
- * @param {string} [filename]
+ * @returns {ArrayBuffer}
  */
-export function exportSTL(geometry, filename = 'textured.stl') {
+export function geometryToSTLBinary(geometry) {
   const posArr = geometry.attributes.position.array;
   const norArr = geometry.attributes.normal
     ? geometry.attributes.normal.array
@@ -78,7 +78,15 @@ export function exportSTL(geometry, filename = 'textured.stl') {
     // Attribute byte count: 0 (already zero-filled)
   }
 
-  triggerDownload(buffer, filename);
+  return buffer;
+}
+
+/**
+ * @param {THREE.BufferGeometry} geometry  – non-indexed with position + normal
+ * @param {string} [filename]
+ */
+export function exportSTL(geometry, filename = 'textured.stl') {
+  triggerDownload(geometryToSTLBinary(geometry), filename);
 }
 
 /**

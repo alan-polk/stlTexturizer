@@ -363,6 +363,13 @@ main {
 }
 
 /* ── Profile toolbar (Orca-style row) ───────────────────────────────── */
+.project-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin-bottom: 10px;
+}
+
 .profile-section {
   padding-top: 12px;
   padding-bottom: 12px;
