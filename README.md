@@ -167,3 +167,17 @@ All dependencies are MIT-licensed.
 ## License
 
 GNU AGPL v3.0 — see [LICENSE](LICENSE).
+
+### Optional: macOS Launch Agent (static server at login)
+
+If you use `scripts/install-launchagent.sh`, you can stop or restart the bundled static server with:
+
+```bash
+# Stop (until next login, unless you load again)
+launchctl bootout "gui/$(id -u)/com.stltexturizer.http"
+
+# Start again
+launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.stltexturizer.http.plist"
+```
+
+Or reinstall via `./scripts/uninstall-launchagent.sh` then `./scripts/install-launchagent.sh`.
