@@ -90,6 +90,10 @@ const settings = {
   boundaryFalloff:  0,
   symmetricDisplacement: false,
   useDisplacement: false,
+  /** When true, UV normalization uses referenceExtentMm instead of each mesh's largest bbox edge. */
+  fixedWorldTextureScale: false,
+  /** Millimetres: one normalized UV span along an axis (before Scale U/V). */
+  referenceExtentMm: 200,
 };
 
 // ── Canvas filter support (Safari / iOS WebView don't support ctx.filter) ────
@@ -248,6 +252,15 @@ const boundaryFalloffSlider    = document.getElementById('boundary-falloff');
 const boundaryFalloffVal       = document.getElementById('boundary-falloff-val');
 const symmetricDispToggle    = document.getElementById('symmetric-displacement');
 const dispPreviewToggle      = document.getElementById('displacement-preview');
+const fixedWorldTextureToggle = document.getElementById('fixed-world-texture');
+const referenceExtentRow      = document.getElementById('reference-extent-row');
+const referenceExtentMmVal    = document.getElementById('reference-extent-mm');
+
+function refreshReferenceExtentUi() {
+  if (referenceExtentRow) {
+    referenceExtentRow.style.display = settings.fixedWorldTextureScale ? '' : 'none';
+  }
+}
 
 // ── Exclusion panel DOM refs ──────────────────────────────────────────────────
 const exclBrushBtn        = document.getElementById('excl-brush-btn');
@@ -621,6 +634,33 @@ function wireEvents() {
       updatePreview();
     }
   });
+
+  if (fixedWorldTextureToggle) {
+    fixedWorldTextureToggle.addEventListener('change', () => {
+      settings.fixedWorldTextureScale = fixedWorldTextureToggle.checked;
+      refreshReferenceExtentUi();
+      clearTimeout(previewDebounce); previewDebounce = setTimeout(updatePreview, 80);
+      scheduleProfileDirtyCheck();
+    });
+  }
+
+  function applyReferenceExtentFromInput() {
+    if (!referenceExtentMmVal) return;
+    let v = parseFloat(referenceExtentMmVal.value);
+    if (!Number.isFinite(v)) v = settings.referenceExtentMm;
+    v = Math.max(0.1, Math.min(10000, v));
+    settings.referenceExtentMm = v;
+    referenceExtentMmVal.value = v;
+    clearTimeout(previewDebounce); previewDebounce = setTimeout(updatePreview, 80);
+    scheduleProfileDirtyCheck();
+  }
+  if (referenceExtentMmVal) {
+    referenceExtentMmVal.addEventListener('change', applyReferenceExtentFromInput);
+    addFineWheelSupport(referenceExtentMmVal, (v) => {
+      referenceExtentMmVal.value = v;
+      applyReferenceExtentFromInput();
+    });
+  }
 
   linkSlider(offsetUSlider,   offsetUVal,   v => { settings.offsetU   = v; return v.toFixed(2); });
   linkSlider(offsetVSlider,   offsetVVal,   v => { settings.offsetV   = v; return v.toFixed(2); });
@@ -1799,6 +1839,12 @@ function syncSettingsToDom() {
 
   symmetricDispToggle.checked = settings.symmetricDisplacement;
   dispPreviewToggle.checked = settings.useDisplacement;
+
+  if (fixedWorldTextureToggle) fixedWorldTextureToggle.checked = settings.fixedWorldTextureScale;
+  if (referenceExtentMmVal) {
+    referenceExtentMmVal.value = settings.referenceExtentMm;
+  }
+  refreshReferenceExtentUi();
 }
 
 function applyExclusionUiPayload(ui) {
@@ -1835,6 +1881,8 @@ async function applyProfilePayload(payload, opts = {}) {
     for (const k of Object.keys(settings)) {
       if (k in payload.settings) settings[k] = payload.settings[k];
     }
+    if (!('fixedWorldTextureScale' in payload.settings)) settings.fixedWorldTextureScale = false;
+    if (!('referenceExtentMm' in payload.settings)) settings.referenceExtentMm = 200;
 
     syncSettingsToDom();
 
