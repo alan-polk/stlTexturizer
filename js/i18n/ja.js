@@ -6,7 +6,7 @@ export default {
   "dropHint.text": "<strong>.stl</strong>、<strong>.obj</strong>、<strong>.3mf</strong> ファイルをここにドロップ<br/>または <label for=\"stl-file-input\" class=\"link-label\">クリックして参照</label>",
   "ui.wireframe": "ワイヤーフレーム",
   "ui.perspective": "透視投影ビュー",
-  "ui.controlsHint": "左ドラッグ: 回転  ·  右ドラッグ: パン  ·  スクロール: ズーム",
+  "ui.controlsHint": "左ドラッグ: 回転  ·  右またはホイール押しドラッグ: パン  ·  スクロール: ズーム",
   "ui.meshInfo": "{n} 三角形 · {mb} MB · {sx} × {sy} × {sz} mm",
   "ui.loadStl": "モデルを読み込む…",
   "ui.localProcessingNote": "すべての処理はブラウザ内でローカルに実行されます — データはアップロードされません。",

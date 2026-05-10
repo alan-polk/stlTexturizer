@@ -6,7 +6,7 @@ export default {
   "dropHint.text": "Arraste um arquivo <strong>.stl</strong>, <strong>.obj</strong> ou <strong>.3mf</strong> aqui<br/>ou <label for=\"stl-file-input\" class=\"link-label\">clique para procurar</label>",
   "ui.wireframe": "Wireframe",
   "ui.perspective": "Vista em perspectiva",
-  "ui.controlsHint": "Arrastar esq.: orbitar  ·  Arrastar dir.: deslocar  ·  Roda: zoom",
+  "ui.controlsHint": "Arrastar esq.: orbitar  ·  Arrastar dir. ou do meio: deslocar  ·  Roda: zoom",
   "ui.meshInfo": "{n} triângulos · {mb} MB · {sx} × {sy} × {sz} mm",
   "ui.loadStl": "Carregar modelo…",
   "ui.localProcessingNote": "Todo o processamento é feito localmente no seu navegador — nenhum dado é enviado.",

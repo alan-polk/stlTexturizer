@@ -417,6 +417,61 @@ populateLanguageSelector();
   }
 })();
 
+// Preset texture swatches (must run before wireEvents): if wireEvents() throws on a
+// missing control, this block would otherwise never run and #preset-grid stays empty.
+const DEFAULT_PRESET_NAME = 'Crystal';
+const _presetSwatches = [];
+if (!presetGrid) {
+  console.error('[BumpMesh] #preset-grid missing — preset textures unavailable.');
+} else {
+  for (let idx = 0; idx < IMAGE_PRESETS.length; idx++) {
+    const p = IMAGE_PRESETS[idx];
+    const swatch = document.createElement('div');
+    swatch.className = 'preset-swatch preset-loading';
+    swatch.setAttribute('role', 'button');
+    swatch.setAttribute('tabindex', '0');
+    swatch.title = p.name;
+
+    const placeholder = document.createElement('canvas');
+    placeholder.width = 80; placeholder.height = 80;
+    swatch.appendChild(placeholder);
+
+    const label = document.createElement('span');
+    label.className = 'preset-label';
+    label.textContent = p.name;
+    swatch.appendChild(label);
+
+    swatch.addEventListener('click', () => selectPreset(idx, swatch));
+    swatch.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        selectPreset(idx, swatch);
+      }
+    });
+    presetGrid.appendChild(swatch);
+    _presetSwatches.push(swatch);
+  }
+
+  loadAllThumbnails().then(thumbs => {
+    thumbs.forEach((thumb, idx) => {
+      if (!thumb) return;
+      PRESETS[idx] = thumb;
+      const swatch = _presetSwatches[idx];
+      if (!swatch) return;
+      swatch.classList.remove('preset-loading');
+      const placeholder = swatch.querySelector('canvas');
+      swatch.replaceChild(thumb.thumbCanvas, placeholder);
+    });
+    initProfiles();
+    initProjectFiles();
+    const crystalIdx = IMAGE_PRESETS.findIndex(p => p.name === DEFAULT_PRESET_NAME);
+    if (crystalIdx >= 0 && PRESETS[crystalIdx]) {
+      selectPreset(crystalIdx, _presetSwatches[crystalIdx]);
+    }
+    setProfileBaselineFromCurrent();
+  }).catch(err => console.error('Failed to load thumbnails:', err));
+}
+
 // Theme toggle
 document.getElementById('theme-toggle').addEventListener('click', () => {
   const isLight = document.documentElement.getAttribute('data-theme') !== 'light';
@@ -432,56 +487,6 @@ scaleVVal.value = posToScale(parseFloat(scaleVSlider.value));
 
 // Load geometry immediately — don't wait for textures
 loadDefaultCube();
-
-// Build swatches with placeholder canvases, then load thumbnails
-const DEFAULT_PRESET_NAME = 'Crystal';
-const _presetSwatches = IMAGE_PRESETS.map((p, idx) => {
-  const swatch = document.createElement('div');
-  swatch.className = 'preset-swatch preset-loading';
-  swatch.setAttribute('role', 'button');
-  swatch.setAttribute('tabindex', '0');
-  swatch.title = p.name;
-
-  const placeholder = document.createElement('canvas');
-  placeholder.width = 80; placeholder.height = 80;
-  swatch.appendChild(placeholder);
-
-  const label = document.createElement('span');
-  label.className = 'preset-label';
-  label.textContent = p.name;
-  swatch.appendChild(label);
-
-  swatch.addEventListener('click', () => selectPreset(idx, swatch));
-  swatch.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      selectPreset(idx, swatch);
-    }
-  });
-  presetGrid.appendChild(swatch);
-  return swatch;
-});
-
-// Load lightweight thumbnails (~49 KB total), then auto-select Crystal
-loadAllThumbnails().then(thumbs => {
-  thumbs.forEach((thumb, idx) => {
-    if (!thumb) return;
-    PRESETS[idx] = thumb;         // thumbnail-only entry for now
-    const swatch = _presetSwatches[idx];
-    if (!swatch) return;
-    swatch.classList.remove('preset-loading');
-    const placeholder = swatch.querySelector('canvas');
-    swatch.replaceChild(thumb.thumbCanvas, placeholder);
-  });
-  initProfiles();
-  initProjectFiles();
-  // Auto-select the default preset
-  const crystalIdx = IMAGE_PRESETS.findIndex(p => p.name === DEFAULT_PRESET_NAME);
-  if (crystalIdx >= 0 && PRESETS[crystalIdx]) {
-    selectPreset(crystalIdx, _presetSwatches[crystalIdx]);
-  }
-  setProfileBaselineFromCurrent();
-}).catch(err => console.error('Failed to load thumbnails:', err));
 
 // ── Preset grid ───────────────────────────────────────────────────────────────
 

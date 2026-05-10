@@ -1,0 +1,13 @@
+{
+  "name": "stltexturizer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "export-project": "node cli/bumpmesh-export.mjs"
+  },
+  "dependencies": {
+    "fflate": "^0.8.2",
+    "sharp": "^0.33.5",
+    "three": "^0.170.0"
+  }
+}

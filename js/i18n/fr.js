@@ -6,7 +6,7 @@ export default {
   "dropHint.text": "Déposez un fichier <strong>.stl</strong>, <strong>.obj</strong> ou <strong>.3mf</strong> ici<br/>ou <label for=\"stl-file-input\" class=\"link-label\">cliquez pour parcourir</label>",
   "ui.wireframe": "Fil de fer",
   "ui.perspective": "Vue en perspective",
-  "ui.controlsHint": "Bouton gauche : orbiter  ·  Bouton droit : panoramique  ·  Molette : zoom",
+  "ui.controlsHint": "Bouton gauche : orbiter  ·  Bouton droit ou du milieu : panoramique  ·  Molette : zoom",
   "ui.meshInfo": "{n} triangles · {mb} Mo · {sx} × {sy} × {sz} mm",
   "ui.loadStl": "Charger un modèle…",
   "ui.localProcessingNote": "Tout le traitement s'effectue localement dans votre navigateur — aucune donnée n'est envoyée.",

@@ -6,7 +6,7 @@ export default {
   "dropHint.text": "Arrastra aquí un archivo <strong>.stl</strong>, <strong>.obj</strong> o <strong>.3mf</strong><br/>o <label for=\"stl-file-input\" class=\"link-label\">haz clic para explorar</label>",
   "ui.wireframe": "Malla de alambre",
   "ui.perspective": "Vista en perspectiva",
-  "ui.controlsHint": "Arrastrar izq.: orbitar  ·  Arrastrar der.: desplazar  ·  Rueda: zoom",
+  "ui.controlsHint": "Arrastrar izq.: orbitar  ·  Arrastrar der. o central: desplazar  ·  Rueda: zoom",
   "ui.meshInfo": "{n} triángulos · {mb} MB · {sx} × {sy} × {sz} mm",
   "ui.loadStl": "Cargar modelo…",
   "ui.localProcessingNote": "Todo el procesamiento se realiza localmente en tu navegador — no se suben datos.",

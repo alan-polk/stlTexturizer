@@ -6,7 +6,7 @@ export default {
   "dropHint.text": "Drop an <strong>.stl</strong>, <strong>.obj</strong> or <strong>.3mf</strong> file here<br/>or <label for=\"stl-file-input\" class=\"link-label\">click to browse</label>",
   "ui.wireframe": "Wireframe",
   "ui.perspective": "Perspective View",
-  "ui.controlsHint": "Left drag: orbit  ·  Right drag: pan  ·  Scroll: zoom",
+  "ui.controlsHint": "Left drag: orbit  ·  Right or middle drag: pan  ·  Scroll: zoom",
   "ui.meshInfo": "{n} triangles · {mb} MB · {sx} × {sy} × {sz} mm",
   "ui.loadStl": "Load Model…",
   "profile.label": "Profile",

@@ -149,6 +149,17 @@ Open http://localhost:8000 in your browser and you're ready to go.
 
 > **Tip:** Any static server will work — the app has no server-side dependencies.
 
+### Headless export (optional)
+
+To process a **Save project…** ZIP outside the browser (higher memory limits than a tab), install Node dependencies from the repo root and run:
+
+```bash
+npm install
+node --max-old-space-size=16384 cli/bumpmesh-export.mjs path/to/your-project.zip -o out.stl
+```
+
+Preset textures are loaded from `./textures/` relative to the repository unless you pass `--repo-root <dir>`. Custom maps are embedded in the project profile.
+
 ## Dependencies
 
 Loaded via CDN ([jsDelivr](https://www.jsdelivr.com/)) — no build step or npm install needed:

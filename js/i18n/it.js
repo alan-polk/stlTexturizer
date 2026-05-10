@@ -6,7 +6,7 @@ export default {
   "dropHint.text": "Trascina qui un file <strong>.stl</strong>, <strong>.obj</strong> o <strong>.3mf</strong><br/>o <label for=\"stl-file-input\" class=\"link-label\">clicca per sfogliare</label>",
   "ui.wireframe": "Wireframe",
   "ui.perspective": "Vista prospettica",
-  "ui.controlsHint": "Trascina a sx: orbita  ·  Trascina a dx: sposta  ·  Scorri: zoom",
+  "ui.controlsHint": "Trascina a sx: orbita  ·  Trascina a dx o centrale: sposta  ·  Scorri: zoom",
   "ui.meshInfo": "{n} triangoli · {mb} MB · {sx} × {sy} × {sz} mm",
   "ui.loadStl": "Carica Modello…",
   "ui.localProcessingNote": "Tutta l'elaborazione avviene localmente nel browser — nessun dato viene caricato.",

@@ -19,6 +19,18 @@ function triggerDownload(buffer, filename, mime = 'application/octet-stream') {
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
+/** Concatenate UTF-8 chunks without building one huge intermediate string (avoids RangeError). */
+function concatUint8Arrays(parts) {
+  let total = 0;
+  for (let i = 0; i < parts.length; i++) total += parts[i].length;
+  const out = new Uint8Array(total);
+  for (let i = 0, o = 0; i < parts.length; i++) {
+    out.set(parts[i], o);
+    o += parts[i].length;
+  }
+  return out;
+}
+
 /**
  * Fast binary STL — writes directly from BufferGeometry arrays.
  *
@@ -131,59 +143,74 @@ export function export3MF(geometry, filename = 'textured.3mf') {
 
   const vertCount = uniqueXYZ.length / 3;
 
-  // ── Build 3dmodel.model XML ──────────────────────────────────────────────
-  // Stream into an array of string chunks then join once — much faster than
-  // repeated concatenation for large meshes.
-  const chunks = [];
-  chunks.push(
-    '<?xml version="1.0" encoding="UTF-8"?>\n',
-    '<model unit="millimeter" xml:lang="en-US" ',
-    'xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">\n',
-    '<resources>\n',
-    '<object id="1" type="model">\n',
-    '<mesh>\n',
-    '<vertices>\n'
+  // ── Build 3dmodel.model XML as UTF-8 bytes ────────────────────────────────
+  // A single `chunks.join('')` can throw RangeError: Invalid string length on
+  // large meshes (browser string size limit). Encode in bounded batches instead.
+  const te = new TextEncoder();
+  const utf8Parts = [];
+  const pushUtf8 = (str) => utf8Parts.push(te.encode(str));
+
+  // Keep each `join` well under the engine max string length (RangeError on huge meshes).
+  const MAX_JOIN_CHARS = 96 * 1024;
+  let lineBatch = [];
+  let batchChars = 0;
+  const flushLines = () => {
+    if (!lineBatch.length) return;
+    utf8Parts.push(te.encode(lineBatch.join('\n') + '\n'));
+    lineBatch = [];
+    batchChars = 0;
+  };
+  const pushLine = (s) => {
+    const sep = lineBatch.length ? 1 : 0; // '\n' between lines
+    if (batchChars + sep + s.length > MAX_JOIN_CHARS && lineBatch.length) flushLines();
+    const sep2 = lineBatch.length ? 1 : 0;
+    batchChars += sep2 + s.length;
+    lineBatch.push(s);
+  };
+
+  pushUtf8(
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+      '<model unit="millimeter" xml:lang="en-US" ' +
+      'xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">\n' +
+      '<resources>\n' +
+      '<object id="1" type="model">\n' +
+      '<mesh>\n' +
+      '<vertices>\n'
   );
 
-  // Vertices: trim trailing zeros to keep the file compact.
   const fmt = (n) => {
-    // 4 decimals matches the dedup precision; strip trailing zeros and ".".
     let s = n.toFixed(4);
     if (s.indexOf('.') !== -1) s = s.replace(/0+$/, '').replace(/\.$/, '');
     return s;
   };
   for (let i = 0; i < vertCount; i++) {
     const b = i * 3;
-    chunks.push(
-      '<vertex x="', fmt(uniqueXYZ[b]),
-      '" y="', fmt(uniqueXYZ[b + 1]),
-      '" z="', fmt(uniqueXYZ[b + 2]),
-      '"/>\n'
+    pushLine(
+      `<vertex x="${fmt(uniqueXYZ[b])}" y="${fmt(uniqueXYZ[b + 1])}" z="${fmt(uniqueXYZ[b + 2])}"/>`
     );
   }
+  flushLines();
 
-  chunks.push('</vertices>\n<triangles>\n');
+  pushUtf8('</vertices>\n<triangles>\n');
 
   for (let i = 0; i < triCount; i++) {
     const b = i * 3;
-    chunks.push(
-      '<triangle v1="', triIdx[b],
-      '" v2="', triIdx[b + 1],
-      '" v3="', triIdx[b + 2],
-      '"/>\n'
+    pushLine(
+      `<triangle v1="${triIdx[b]}" v2="${triIdx[b + 1]}" v3="${triIdx[b + 2]}"/>`
     );
   }
+  flushLines();
 
-  chunks.push(
-    '</triangles>\n',
-    '</mesh>\n',
-    '</object>\n',
-    '</resources>\n',
-    '<build>\n<item objectid="1"/>\n</build>\n',
-    '</model>\n'
+  pushUtf8(
+    '</triangles>\n' +
+      '</mesh>\n' +
+      '</object>\n' +
+      '</resources>\n' +
+      '<build>\n<item objectid="1"/>\n</build>\n' +
+      '</model>\n'
   );
 
-  const modelXml = chunks.join('');
+  const modelBytes = concatUint8Arrays(utf8Parts);
 
   // ── Static package files ─────────────────────────────────────────────────
   const contentTypesXml =
@@ -204,7 +231,7 @@ export function export3MF(geometry, filename = 'textured.3mf') {
   const zipped = zipSync({
     '[Content_Types].xml': strToU8(contentTypesXml),
     '_rels/.rels':         strToU8(relsXml),
-    '3D/3dmodel.model':    strToU8(modelXml),
+    '3D/3dmodel.model':    modelBytes,
   }, { level: 6 });
 
   triggerDownload(

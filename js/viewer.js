@@ -202,6 +202,12 @@ export function initViewer(canvas) {
   controls.dampingFactor = 0.08;
   controls.screenSpacePanning = true;
   controls.enableZoom = false; // we handle zoom ourselves for cursor-centric behaviour
+  // Middle button pans like right (easier on trackballs); default middle is dolly, which we don't use.
+  controls.mouseButtons = {
+    LEFT: THREE.MOUSE.ROTATE,
+    MIDDLE: THREE.MOUSE.PAN,
+    RIGHT: THREE.MOUSE.PAN,
+  };
 
   // Raycast-based orbit pivot: when left-drag starts on the model, orbit
   // around the surface point under the cursor instead of the default target.

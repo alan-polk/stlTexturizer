@@ -6,7 +6,7 @@ export default {
   "dropHint.text": "<strong>.stl</strong>-, <strong>.obj</strong>- oder <strong>.3mf</strong>-Datei hier ablegen<br/>oder <label for=\"stl-file-input\" class=\"link-label\">zum Durchsuchen klicken</label>",
   "ui.wireframe": "Drahtgitter",
   "ui.perspective": "Perspektivansicht",
-  "ui.controlsHint": "Linke Maustaste: Drehen  ·  Rechte Maustaste: Verschieben  ·  Mausrad: Zoomen",
+  "ui.controlsHint": "Linke Maustaste: Drehen  ·  Rechte oder mittlere Maustaste: Verschieben  ·  Mausrad: Zoomen",
   "ui.meshInfo": "{n} Dreiecke · {mb} MB · {sx} × {sy} × {sz} mm",
   "ui.loadStl": "Modell laden…",
   "profile.label": "Profil",

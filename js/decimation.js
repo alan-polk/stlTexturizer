@@ -94,20 +94,101 @@ export async function decimate(geometry, targetTriangles, onProgress) {
 
   // Seed min-heap with one entry per unique edge.
   // Use Number keys when vertCount < 94M (safe integer range), BigInt otherwise.
+  // V8 caps Set/Map at ~2^24−1 entries; ~10M+ triangles can yield >16M unique edges.
+  // Fall back to sort-based dedup (no Set) when that risk applies.
   const heap     = new SoAHeap(Math.min(faceCount * 3, 1 << 24));
-  const seedSeen = new Set();
   const _useNumericSeed = vertCount < 94_000_000;
-  for (let f = 0; f < faceCount; f++) {
-    if (faces[f * 3] < 0) continue;
-    for (let e = 0; e < 3; e++) {
-      const va = faces[f * 3 + e];
-      const vb = faces[f * 3 + ((e + 1) % 3)];
-      const lo = va < vb ? va : vb, hi = va < vb ? vb : va;
-      const ek = _useNumericSeed ? lo * vertCount + hi : BigInt(lo) * BigInt(vertCount) + BigInt(hi);
-      if (!seedSeen.has(ek)) { seedSeen.add(ek); pushEdge(heap, quadrics, positions, version, va, vb); }
+  const V8_COLLECTION_SAFE = 16_000_000;
+  const estUniqueEdges = Math.floor(faceCount * 1.5);
+  const useSortSeed = estUniqueEdges >= V8_COLLECTION_SAFE;
+
+  if (!useSortSeed) {
+    const seedSeen = new Set();
+    for (let f = 0; f < faceCount; f++) {
+      if (faces[f * 3] < 0) continue;
+      for (let e = 0; e < 3; e++) {
+        const va = faces[f * 3 + e];
+        const vb = faces[f * 3 + ((e + 1) % 3)];
+        const lo = va < vb ? va : vb, hi = va < vb ? vb : va;
+        const ek = _useNumericSeed ? lo * vertCount + hi : BigInt(lo) * BigInt(vertCount) + BigInt(hi);
+        if (!seedSeen.has(ek)) { seedSeen.add(ek); pushEdge(heap, quadrics, positions, version, va, vb); }
+      }
+    }
+    seedSeen.clear();
+  } else if (_useNumericSeed) {
+    const maxHalf = faceCount * 3;
+    const ekBuf = new Float64Array(maxHalf);
+    const orderBuf = new Uint32Array(maxHalf);
+    const vaBuf = new Uint32Array(maxHalf);
+    const vbBuf = new Uint32Array(maxHalf);
+    let t = 0;
+    for (let f = 0; f < faceCount; f++) {
+      if (faces[f * 3] < 0) continue;
+      for (let e = 0; e < 3; e++) {
+        const va = faces[f * 3 + e];
+        const vb = faces[f * 3 + ((e + 1) % 3)];
+        const lo = va < vb ? va : vb, hi = va < vb ? vb : va;
+        ekBuf[t] = lo * vertCount + hi;
+        orderBuf[t] = f * 3 + e;
+        vaBuf[t] = va;
+        vbBuf[t] = vb;
+        t++;
+      }
+    }
+    const idx = Array.from({ length: t }, (_, i) => i);
+    idx.sort((i, j) => {
+      const d = ekBuf[i] - ekBuf[j];
+      if (d !== 0) return d;
+      return orderBuf[i] - orderBuf[j];
+    });
+    let lastEk = NaN;
+    for (let k = 0; k < t; k++) {
+      const i = idx[k];
+      const ek = ekBuf[i];
+      if (ek !== lastEk) {
+        lastEk = ek;
+        pushEdge(heap, quadrics, positions, version, vaBuf[i], vbBuf[i]);
+      }
+    }
+  } else {
+    // BigInt edge keys + huge mesh: sort bigint keys (rare: vertCount ≥ 94M)
+    const maxHalf = faceCount * 3;
+    const ekBuf = new BigUint64Array(maxHalf);
+    const orderBuf = new Uint32Array(maxHalf);
+    const vaBuf = new Uint32Array(maxHalf);
+    const vbBuf = new Uint32Array(maxHalf);
+    let t = 0;
+    const vn = BigInt(vertCount);
+    for (let f = 0; f < faceCount; f++) {
+      if (faces[f * 3] < 0) continue;
+      for (let e = 0; e < 3; e++) {
+        const va = faces[f * 3 + e];
+        const vb = faces[f * 3 + ((e + 1) % 3)];
+        const lo = va < vb ? va : vb, hi = va < vb ? vb : va;
+        ekBuf[t] = BigInt(lo) * vn + BigInt(hi);
+        orderBuf[t] = f * 3 + e;
+        vaBuf[t] = va;
+        vbBuf[t] = vb;
+        t++;
+      }
+    }
+    const idx = Array.from({ length: t }, (_, i) => i);
+    idx.sort((i, j) => {
+      const a = ekBuf[i], b = ekBuf[j];
+      if (a < b) return -1;
+      if (a > b) return 1;
+      return orderBuf[i] - orderBuf[j];
+    });
+    let lastEk = null;
+    for (let k = 0; k < t; k++) {
+      const i = idx[k];
+      const ek = ekBuf[i];
+      if (lastEk === null || ek !== lastEk) {
+        lastEk = ek;
+        pushEdge(heap, quadrics, positions, version, vaBuf[i], vbBuf[i]);
+      }
     }
   }
-  seedSeen.clear();
 
   const initFaces  = activeFaces;
   const toRemove   = initFaces - targetTriangles;
@@ -372,6 +453,13 @@ function faceNormal(ax, ay, az, bx, by, bz, cx, cy, cz) {
 // smooth-surface edges and are therefore collapsed last (or not at all).
 
 function addCreaseQuadrics(quadrics, positions, faces, faceCount) {
+  // V8 caps Map size around 2^24 − 1 entries.  This pass stores one entry per
+  // unique undirected edge (~≤ 1.5× triangle count for typical manifolds).
+  // Skip crease enhancement when we'd exceed that — decimation still runs; only
+  // sharp-feature preservation is reduced on these huge meshes.
+  const V8_MAP_SAFE = 16_000_000;
+  if (Math.floor(faceCount * 1.5) >= V8_MAP_SAFE) return;
+
   // Build edge → [face, face] map using numeric keys (va_lo * vertMax + vb_hi)
   // vertMax = next power of two >= faceCount*3 vertices upper bound; use faceCount*3
   // as a safe upper bound since #verts ≤ #triangles*3.
